@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Student Dashboard</title>
+  <link rel="stylesheet" href="/resource/css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Smart Study Bot</h1>
+    <nav>
+      <a href="/dashboard">Dashboard</a> |
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <h2>Welcome, {{.Username}} (Student)</h2>
+    <p>Your study plan, assignments, and materials are listed below.</p>
+
+    <div class="card">
+      <h3>📚 Today’s Study Plan</h3>
+      <p>You have 2 hours of Mathematics and 1 hour of Literature today.</p>
+    </div>
+
+    <div class="card">
+      <h3>📝 Upcoming Assignments</h3>
+      {{if .Assignments}}
+        <ul>
+        {{range .Assignments}}
+          <li>
+            <strong>{{.Title}}</strong><br />
+            {{.Description}}<br />
+            <a href="/{{.FilePath}}" target="_blank">Download</a><br />
+            <small>Uploaded: {{.CreatedAt}}</small>
+          </li>
+        {{end}}
+        </ul>
+      {{else}}
+        <p>No assignments uploaded yet.</p>
+      {{end}}
+    </div>
+
+    <div class="card">
+      <h3>❓ Available Quizzes</h3>
+      {{range .Quizzes}}
+        <p><strong>{{.Title}}</strong><br>
+        Created: {{.CreatedAt}}<br>
+        <a href="/quiz/{{.ID}}">Attempt Quiz</a></p>
+      {{else}}
+        <p>No quizzes available yet.</p>
+      {{end}}
+    </div>
+    
+  </div>
+</body>
+</html>

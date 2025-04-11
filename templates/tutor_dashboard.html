@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tutor Dashboard</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Smart Study Bot</h1>
+    <nav>
+      <a href="/dashboard">Dashboard</a> |
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+  <div class="container">
+    <h2>Welcome, {{.Username}} (Tutor)</h2>
+
+    <!-- Create Quiz Form -->
+    <div class="card">
+      <h3>Create New Quiz</h3>
+      <form action="/create_quiz" method="POST">
+        <input type="text" name="title" placeholder="Quiz Title" required><br>
+        <textarea name="question" placeholder="Question" required></textarea><br>
+        <input type="text" name="optionA" placeholder="Option A" required>
+        <input type="text" name="optionB" placeholder="Option B" required>
+        <input type="text" name="optionC" placeholder="Option C" required>
+        <input type="text" name="optionD" placeholder="Option D" required><br>
+        <input type="text" name="correctOption" placeholder="Correct Option" required><br>
+        <textarea name="explanation" placeholder="Explanation" required></textarea><br>
+        <button type="submit">Create Quiz</button>
+      </form>
+    </div>
+
+    <!-- Upload Assignment -->
+    <div class="card">
+      <h3>Upload Assignment</h3>
+      <form action="/upload_assignment" method="POST" enctype="multipart/form-data">
+        <input type="text" name="title" placeholder="Assignment Title" required><br>
+        <textarea name="description" placeholder="Description" required></textarea><br>
+        <input type="file" name="assignmentFile" required><br>
+        <button type="submit">Upload Assignment</button>
+      </form>
+    </div>
+
+    <!-- Upload Material -->
+    <div class="card">
+      <h3>Upload Study Material</h3>
+      <form action="/upload_material" method="POST" enctype="multipart/form-data">
+        <input type="text" name="title" placeholder="Material Title" required><br>
+        <textarea name="description" placeholder="Description" required></textarea><br>
+        <textarea name="content" placeholder="Additional Content (optional)"></textarea><br>
+        <input type="file" name="materialFile" required><br>
+        <button type="submit">Upload Material</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

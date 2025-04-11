@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quiz Submitted</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Quiz Result</h1>
+    <nav>
+      <a href="/dashboard">Dashboard</a> |
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+  <div class="container">
+    <h2>Your Quiz Score</h2>
+    <p>Score: {{.Score}}%</p>
+    <p>Total Questions: {{.TotalQuestions}}</p>
+    <p>Correct Answers: {{.CorrectAnswers}}</p>
+    <a href="/dashboard">Return to Dashboard</a>
+  </div>
+</body>
+</html>

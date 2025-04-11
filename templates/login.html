@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{.WebsiteTitle}}</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <h1>Smart Study Bot</h1>
+    <nav>
+      <a href="/">Home</a> |
+      <a href="/register">Register</a>
+    </nav>
+  </header>
+  <div class="container">
+    <h2>{{.H1Heading}}</h2>
+    <p>{{.BodyParagraphText}}</p>
+    {{if .PostResponseMessage}}
+      <div class="alert">{{.PostResponseMessage}}</div>
+    {{end}}
+    <form method="POST" action="/login_check">
+      <label for="username">Username:</label>
+      <input type="text" name="username" required>
+      
+      <label for="password">Password:</label>
+      <input type="password" name="password" required>
+      
+      <button type="submit">Login</button>
+    </form>
+  </div>
+</body>
+</html>
