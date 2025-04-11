@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Attempt Quiz</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Quiz Attempt</h1>
+    <nav>
+      <a href="/dashboard">Dashboard</a> |
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+  <div class="container">
+    <h2>Quiz ID: {{.QuizID}}</h2>
+    <form action="/submit_quiz" method="POST">
+      <!-- Hidden field for quiz ID -->
+      <input type="hidden" name="quiz_id" value="{{.QuizID}}">
+      {{range $index, $question := .Questions}}
+        <div class="question-block">
+          <p><strong>Question {{$question.ID}}:</strong> {{$question.Question}}</p>
+          <!-- Loop over options for this question -->
+          {{range $i, $option := $question.Options}}
+            <label>
+              <input type="radio" name="answer_{{$question.ID}}" value="{{$option}}" required> {{$option}}
+            </label><br>
+          {{end}}
+        </div>
+        <hr>
+      {{end}}
+      <button type="submit">Submit Quiz</button>
+    </form>
+  </div>
+</body>
+</html>

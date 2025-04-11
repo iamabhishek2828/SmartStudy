@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tutor Progress</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Tutor Progress</h1>
+    <nav>
+      <a href="/dashboard">Dashboard</a> |
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+  <div class="container">
+    <h2>Student Quiz Attempts</h2>
+    {{if .Attempts}}
+      <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Student Username</th>
+            <th>Quiz Title</th>
+            <th>Score (%)</th>
+            <th>Total Questions</th>
+            <th>Correct Answers</th>
+            <th>Submitted At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Attempts}}
+            <tr>
+              <td>{{.StudentUsername}}</td>
+              <td>{{.QuizTitle}}</td>
+              <td>{{.Score}}</td>
+              <td>{{.TotalQuestions}}</td>
+              <td>{{.CorrectAnswers}}</td>
+              <td>{{.SubmittedAt}}</td>
+            </tr>
+          {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <p>No quiz attempts recorded.</p>
+    {{end}}
+    <a href="/dashboard">Return to Dashboard</a>
+  </div>
+</body>
+</html>
