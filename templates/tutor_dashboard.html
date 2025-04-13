@@ -2,57 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tutor Dashboard</title>
+  <title>Tutor Dashboard - Smart Study Bot</title>
   <link rel="stylesheet" href="/resource/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f4f7f8;
+      margin: 0;
+      padding: 20px;
+    }
+    header {
+      background: #2c3e50;
+      color: #fff;
+      padding: 10px 20px;
+    }
+    header h1 {
+      margin: 0;
+    }
+    nav a {
+      color: #ecf0f1;
+      margin-right: 15px;
+      text-decoration: none;
+    }
+    .container {
+      max-width: 900px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .card {
+      background-color: #ecf0f1;
+      margin-bottom: 20px;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .card h3 {
+      margin-top: 0;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 15px;
+      background-color: #3498db;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .btn:hover {
+      background-color: #2980b9;
+    }
+    form input[type="text"],
+    form textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    form input[type="file"] {
+      margin: 10px 0;
+    }
+    form button {
+      background-color: #27ae60;
+      color: #fff;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    form button:hover {
+      background-color: #219150;
+    }
+  </style>
 </head>
 <body>
   <header>
     <h1>Smart Study Bot</h1>
     <nav>
       <a href="/dashboard">Dashboard</a> |
-      <a href="/logout">Logout</a>
+      <a href="/logout">Logout</a> |
+      <a href="/tutor_progress">View Student Performance</a>
     </nav>
   </header>
   <div class="container">
     <h2>Welcome, {{.Username}} (Tutor)</h2>
 
-    <!-- Create Quiz Form -->
+    <!-- Quiz Creation -->
     <div class="card">
       <h3>Create New Quiz</h3>
       <form action="/create_quiz" method="POST">
-        <input type="text" name="title" placeholder="Quiz Title" required><br>
-        <textarea name="question" placeholder="Question" required></textarea><br>
-        <input type="text" name="optionA" placeholder="Option A" required>
-        <input type="text" name="optionB" placeholder="Option B" required>
-        <input type="text" name="optionC" placeholder="Option C" required>
-        <input type="text" name="optionD" placeholder="Option D" required><br>
-        <input type="text" name="correctOption" placeholder="Correct Option" required><br>
-        <textarea name="explanation" placeholder="Explanation" required></textarea><br>
+        <input type="text" name="title" placeholder="Quiz Title" required>
         <button type="submit">Create Quiz</button>
       </form>
     </div>
 
-    <!-- Upload Assignment -->
+    <!-- Assignment Upload -->
     <div class="card">
       <h3>Upload Assignment</h3>
       <form action="/upload_assignment" method="POST" enctype="multipart/form-data">
-        <input type="text" name="title" placeholder="Assignment Title" required><br>
-        <textarea name="description" placeholder="Description" required></textarea><br>
-        <input type="file" name="assignmentFile" required><br>
+        <input type="text" name="title" placeholder="Assignment Title" required>
+        <textarea name="description" placeholder="Description" required></textarea>
+        <input type="file" name="assignmentFile" required>
         <button type="submit">Upload Assignment</button>
       </form>
     </div>
 
-    <!-- Upload Material -->
+    <!-- Material Upload -->
     <div class="card">
       <h3>Upload Study Material</h3>
       <form action="/upload_material" method="POST" enctype="multipart/form-data">
-        <input type="text" name="title" placeholder="Material Title" required><br>
-        <textarea name="description" placeholder="Description" required></textarea><br>
-        <textarea name="content" placeholder="Additional Content (optional)"></textarea><br>
-        <input type="file" name="materialFile" required><br>
+        <input type="text" name="title" placeholder="Material Title" required>
+        <textarea name="description" placeholder="Description" required></textarea>
+        <textarea name="content" placeholder="Additional Content (optional)"></textarea>
+        <input type="file" name="materialFile" required>
         <button type="submit">Upload Material</button>
       </form>
+    </div>
+
+    <!-- Link to Tutor Progress -->
+    <div class="card">
+      <h3>Review Student Performance</h3>
+      <p>Click the button below to view the quiz attempts and progress of your students.</p>
+      <a class="btn" href="/tutor_progress">View Student Performance</a>
     </div>
   </div>
 </body>

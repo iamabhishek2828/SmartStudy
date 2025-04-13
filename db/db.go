@@ -63,33 +63,28 @@ func ValidateUser(username, password string) (bool, error) {
 	return true, nil
 }
 
-// CreateQuiz inserts a new quiz into the quizzes table and adds a question into quiz_questions.
-// Options are stored in JSON format.
-func CreateQuiz(title, question string, options []string, correctOption, explanation string) (int64, error) {
-	quizQuery := "INSERT INTO quizzes (title, created_at) VALUES (?, NOW())"
-	res, err := DB.Exec(quizQuery, title)
+// CreateQuiz creates a new quiz with a title and returns the quiz ID.
+func CreateQuiz(title string) (int64, error) {
+	query := "INSERT INTO quizzes (title, created_at) VALUES (?, NOW())"
+	res, err := DB.Exec(query, title)
 	if err != nil {
 		return 0, fmt.Errorf("error creating quiz: %v", err)
 	}
-	quizID, err := res.LastInsertId()
-	if err != nil {
-		return quizID, err
-	}
+	return res.LastInsertId()
+}
 
-	// Convert options slice into a JSON string.
+// AddQuestionToQuiz adds a new question to an existing quiz.
+func AddQuestionToQuiz(quizID int64, question string, options []string, correctOption, explanation string) error {
 	optionsJSON, err := json.Marshal(options)
 	if err != nil {
-		return quizID, fmt.Errorf("error marshaling options: %v", err)
+		return fmt.Errorf("error marshaling options: %v", err)
 	}
 
-	questionQuery := `
-        INSERT INTO quiz_questions (quiz_id, question, options, correct_option, explanation, created_at)
-        VALUES (?, ?, ?, ?, ?, NOW())`
-	_, err = DB.Exec(questionQuery, quizID, question, string(optionsJSON), correctOption, explanation)
-	if err != nil {
-		return quizID, fmt.Errorf("error creating quiz question: %v", err)
-	}
-	return quizID, nil
+	query := `
+		INSERT INTO quiz_questions (quiz_id, question, options, correct_option, explanation, created_at)
+		VALUES (?, ?, ?, ?, ?, NOW())`
+	_, err = DB.Exec(query, quizID, question, string(optionsJSON), correctOption, explanation)
+	return err
 }
 
 // CreateAssignment inserts a new assignment record into the assignments table.

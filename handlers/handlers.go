@@ -303,8 +303,11 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // ------------------ Tutor-specific Handlers ------------------
+func ShowCreateQuizForm(w http.ResponseWriter, r *http.Request) {
+	renderTemplate(w, "create_quiz", nil)
+}
 
-// CreateQuizHandler allows a tutor to create a quiz.
+// CreateQuizHandler processes the quiz creation form submission.
 func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	username, ok := session.Values["username"].(string)
@@ -316,7 +319,82 @@ func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	title := r.FormValue("title")
+	quizID, err := db.CreateQuiz(title)
+	if err != nil {
+		http.Error(w, "Error creating quiz", http.StatusInternalServerError)
+		fmt.Println("DB error in CreateQuiz:", err)
+		return
+	}
+	// After creating the quiz, redirect to the add-question page.
+	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
+}
+
+// ShowAddQuestionForm renders a form to add a question to an existing quiz
+// and lists the existing questions for that quiz.
+func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
+	quizID := r.URL.Query().Get("quiz_id")
+	qID, err := strconv.Atoi(quizID)
+	if err != nil {
+		http.Error(w, "Invalid quiz ID", http.StatusBadRequest)
+		return
+	}
+
+	// Define a structure for quiz questions.
+	type Question struct {
+		ID       int
+		Question string
+		Options  []string
+	}
+
+	questions := []Question{}
+	rows, err := db.DB.Query("SELECT id, question, options FROM quiz_questions WHERE quiz_id = ?", qID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var q Question
+			var optionsJSON string
+			if err := rows.Scan(&q.ID, &q.Question, &optionsJSON); err != nil {
+				http.Error(w, "Error scanning quiz questions", http.StatusInternalServerError)
+				return
+			}
+			// Parse the JSON options
+			if err := json.Unmarshal([]byte(optionsJSON), &q.Options); err != nil {
+				q.Options = []string{} // Fallback if parsing fails.
+			}
+			questions = append(questions, q)
+		}
+	} else {
+		// You might want to log the error; if no rows found, questions will remain empty.
+		fmt.Println("Error fetching questions:", err)
+	}
+
+	// Prepare data to pass to the template.
+	data := struct {
+		QuizID    string
+		Questions []Question
+	}{
+		QuizID:    quizID,
+		Questions: questions,
+	}
+	renderTemplate(w, "add_question", data)
+}
+
+// HandleAddQuestion processes the form submission for adding a question.
+func HandleAddQuestion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	quizIDStr := r.FormValue("quiz_id")
+	quizID, err := strconv.ParseInt(quizIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid quiz ID", http.StatusBadRequest)
+		return
+	}
+
 	question := r.FormValue("question")
 	optionA := r.FormValue("optionA")
 	optionB := r.FormValue("optionB")
@@ -324,14 +402,16 @@ func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 	optionD := r.FormValue("optionD")
 	correctOption := r.FormValue("correctOption")
 	explanation := r.FormValue("explanation")
+
 	options := []string{optionA, optionB, optionC, optionD}
-	quizID, err := db.CreateQuiz(title, question, options, correctOption, explanation)
+
+	err = db.AddQuestionToQuiz(quizID, question, options, correctOption, explanation)
 	if err != nil {
-		http.Error(w, "Error creating quiz", http.StatusInternalServerError)
-		fmt.Println("DB error in CreateQuiz:", err)
+		http.Error(w, "Failed to add question", http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, "Quiz created successfully with ID: %d", quizID)
+	// Redirect back to the add question form so the tutor can add another question.
+	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
 }
 
 // UploadAssignmentHandler allows a tutor to upload an assignment file.
@@ -451,9 +531,7 @@ func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
 
 // ------------------ Student Quiz Handlers ------------------
 
-// AttemptQuizHandler fetches a quiz by ID from the URL, loads its questions, and renders a template.
 func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
-	// Expect URL in format: /quiz/{id}
 	quizIDStr := strings.TrimPrefix(r.URL.Path, "/quiz/")
 	quizID, err := strconv.Atoi(quizIDStr)
 	if err != nil {
@@ -482,7 +560,7 @@ func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := json.Unmarshal([]byte(optionsJSON), &q.Options); err != nil {
-			q.Options = []string{} // Fallback if parse fails
+			q.Options = []string{} // fallback if parse fails
 		}
 		questions = append(questions, q)
 	}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Question - Smart Study Bot</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f4f7f8;
+      padding: 20px;
+    }
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #34495e;
+    }
+    textarea,
+    input[type="text"],
+    button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .question-list {
+      margin-bottom: 30px;
+    }
+    .question-item {
+      background-color: #ecf0f1;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+    }
+    .question-item strong {
+      color: #2c3e50;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Add a Question to Quiz ID: {{.QuizID}}</h2>
+    
+    {{if .Questions}}
+      <div class="question-list">
+        <h3>Existing Questions</h3>
+        <ul>
+          {{range .Questions}}
+            <li class="question-item">
+              <strong>Question {{.ID}}:</strong> {{.Question}}<br>
+              <em>Options:</em> {{range .Options}}{{.}}, {{end}}
+            </li>
+          {{end}}
+        </ul>
+      </div>
+    {{end}}
+    
+    <form action="/add_question" method="POST">
+      <input type="hidden" name="quiz_id" value="{{.QuizID}}">
+      <textarea name="question" placeholder="Enter Question" required></textarea>
+      <input type="text" name="optionA" placeholder="Option A" required>
+      <input type="text" name="optionB" placeholder="Option B" required>
+      <input type="text" name="optionC" placeholder="Option C" required>
+      <input type="text" name="optionD" placeholder="Option D" required>
+      <input type="text" name="correctOption" placeholder="Correct Option (A/B/C/D)" required>
+      <textarea name="explanation" placeholder="Explanation" required></textarea>
+      <button type="submit">Add Question</button>
+    </form>
+    <br>
+    <a href="/dashboard">Return to Dashboard</a>
+  </div>
+</body>
+</html>

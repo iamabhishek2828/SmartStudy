@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Student Dashboard</title>
-  <link rel="stylesheet" href="/resource/css/style.css" />
+  <meta charset="UTF-8">
+  <title>Student Dashboard - Smart Study Bot</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
 </head>
 <body>
   <header>
@@ -13,25 +13,24 @@
       <a href="/logout">Logout</a>
     </nav>
   </header>
-
   <div class="container">
     <h2>Welcome, {{.Username}} (Student)</h2>
-    <p>Your study plan, assignments, and materials are listed below.</p>
-
+    
+    <!-- Study Plan Section (as before) -->
     <div class="card">
       <h3>📚 Today’s Study Plan</h3>
       <p>You have 2 hours of Mathematics and 1 hour of Literature today.</p>
     </div>
-
+    
+    <!-- Assignments Section -->
     <div class="card">
       <h3>📝 Upcoming Assignments</h3>
       {{if .Assignments}}
         <ul>
         {{range .Assignments}}
           <li>
-            <strong>{{.Title}}</strong><br />
-            {{.Description}}<br />
-            <a href="/{{.FilePath}}" target="_blank">Download</a><br />
+            <strong>{{.Title}}</strong> - {{.Description}}<br>
+            <a href="{{.FilePath}}" download>Download</a>
             <small>Uploaded: {{.CreatedAt}}</small>
           </li>
         {{end}}
@@ -41,17 +40,40 @@
       {{end}}
     </div>
 
+    <!-- Quizzes Section -->
     <div class="card">
       <h3>❓ Available Quizzes</h3>
-      {{range .Quizzes}}
-        <p><strong>{{.Title}}</strong><br>
-        Created: {{.CreatedAt}}<br>
-        <a href="/quiz/{{.ID}}">Attempt Quiz</a></p>
+      {{if .Quizzes}}
+        <ul>
+        {{range .Quizzes}}
+          <li>
+            <strong>{{.Title}}</strong> (Created: {{.CreatedAt}}) - 
+            <a href="/quiz/{{.ID}}">Attempt Quiz</a>
+          </li>
+        {{end}}
+        </ul>
       {{else}}
-        <p>No quizzes available yet.</p>
+        <p>No quizzes available.</p>
       {{end}}
     </div>
-    
+
+    <!-- Materials Section -->
+    <div class="card">
+      <h3>📑 Study Materials</h3>
+      {{if .Materials}}
+        <ul>
+        {{range .Materials}}
+          <li>
+            <strong>{{.Title}}</strong> - {{.Description}}<br>
+            <a href="{{.FilePath}}" target="_blank">View Material</a>
+            <small>Uploaded: {{.CreatedAt}}</small>
+          </li>
+        {{end}}
+        </ul>
+      {{else}}
+        <p>No study materials available yet.</p>
+      {{end}}
+    </div>
   </div>
 </body>
 </html>
