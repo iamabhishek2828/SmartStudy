@@ -20,13 +20,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Global variables for JWT and session store.
 var jwtKey []byte
 var store *sessions.CookieStore
 
-// init loads environment variables and sets up global keys.
 func init() {
-	// Load environment variables from .env file.
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("Warning: .env file not found; using system environment variables")
 	}
@@ -34,14 +31,13 @@ func init() {
 	store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_SECRET")))
 	store.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   72 * 3600, // 72 hours
+		MaxAge:   72 * 3600,
 		HttpOnly: true,
 	}
 	fmt.Println("handlers init: JWT_SECRET =", string(jwtKey))
 	fmt.Println("handlers init: SESSION_SECRET =", os.Getenv("SESSION_SECRET"))
 }
 
-// WebPageData holds common template data.
 type WebPageData struct {
 	WebsiteTitle                 string
 	H1Heading                    string
@@ -50,7 +46,6 @@ type WebPageData struct {
 	PosrResponseHTTPResponseCode string
 }
 
-// renderTemplate loads a template file from the "templates" folder and executes it.
 func renderTemplate(w http.ResponseWriter, tmpl string, data any) {
 	tmplPath := filepath.Join("templates", tmpl+".html")
 	t, err := template.ParseFiles(tmplPath)
@@ -60,8 +55,6 @@ func renderTemplate(w http.ResponseWriter, tmpl string, data any) {
 	}
 	t.Execute(w, data)
 }
-
-// generateRandomString returns a random hexadecimal string.
 func generateRandomString(length int) string {
 	bytes := make([]byte, length)
 	_, err := rand.Read(bytes)
@@ -70,25 +63,17 @@ func generateRandomString(length int) string {
 	}
 	return hex.EncodeToString(bytes)
 }
-
-// GenerateJWT creates a JWT token for the provided username.
 func GenerateJWT(username string) (string, error) {
 	claims := jwt.MapClaims{
 		"username": username,
-		"exp":      time.Now().Add(time.Hour * 1).Unix(), // Token valid for 1 hour
+		"exp":      time.Now().Add(time.Hour * 1).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
 }
-
-// ----------------------- Basic Handlers ------------------------
-
-// HomeHandler renders the home page.
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "home", nil)
 }
-
-// LoginHandler renders the login page.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	data := WebPageData{
 		WebsiteTitle:      "Smart Study Bot - Login",
@@ -97,8 +82,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "login", data)
 }
-
-// LoginCheckHandler processes login submission using bcrypt for password validation.
 func LoginCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -144,7 +127,9 @@ func LoginCheckHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	session.Values["username"] = username
 	session.Values["authenticatedUser"] = true
+	session.Values["role"] = role
 	err = session.Save(r, w)
+
 	if err != nil {
 		fmt.Println("Session save error:", err)
 		http.Error(w, "Server error", http.StatusInternalServerError)
@@ -163,8 +148,6 @@ func LoginCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
-
-// RegisterHandler processes user registration.
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	data := WebPageData{
 		WebsiteTitle:      "Smart Study Bot - Register",
@@ -176,37 +159,34 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		username := strings.TrimSpace(r.FormValue("username"))
 		email := strings.TrimSpace(r.FormValue("email"))
 		password := strings.TrimSpace(r.FormValue("password"))
-		// CreateUser now handles bcrypt in the db package.
-		id, err := db.CreateUser(username, email, password, "student")
+		role := strings.ToLower(strings.TrimSpace(r.FormValue("role")))
+		if role != "tutor" && role != "student" {
+			role = "student"
+		}
+
+		id, err := db.CreateUser(username, email, password, role)
 		if err != nil {
 			data.PostResponseMessage = "Registration failed, please contact administrator."
 		} else {
-			data.PostResponseMessage = "Registration successful for " + username + " (User ID: " + strconv.Itoa(int(id)) + ")"
+			data.PostResponseMessage = "Registration successful for " + username + " (" + role + ") with ID: " + strconv.FormatInt(id, 10)
+
 		}
 	}
 
 	renderTemplate(w, "register", data)
 }
 
-// DashboardHandler renders either the tutor or student dashboard based on session.
-// For students, it fetches assignments and quizzes.
 func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("DashboardHandler: reached")
 	session, _ := store.Get(r, "smartstudy-session")
 	user, ok := session.Values["username"].(string)
-	if !ok || user == "" {
+	role, roleOK := session.Values["role"].(string)
+	if !ok || user == "" || !roleOK || role == "" {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	var role string
-	err := db.DB.QueryRow("SELECT role FROM users WHERE username = ?", user).Scan(&role)
-	if err != nil {
-		http.Error(w, "Error retrieving user role", http.StatusInternalServerError)
-		return
-	}
 	role = strings.ToLower(role)
-
 	if role == "tutor" {
 		renderTemplate(w, "tutor_dashboard", map[string]string{
 			"Username": user,
@@ -214,8 +194,6 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	// For students, fetch assignments and quizzes.
 	type Assignment struct {
 		Title       string
 		Description string
@@ -226,6 +204,12 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 		ID        int
 		Title     string
 		CreatedAt string
+	}
+	type Material struct {
+		Title       string
+		Description string
+		FilePath    string
+		CreatedAt   string
 	}
 
 	assignments := []Assignment{}
@@ -249,21 +233,31 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 			quizzes = append(quizzes, q)
 		}
 	}
+	materials := []Material{}
+	rows3, err := db.DB.Query(`SELECT title, description, file_path, created_at FROM materials ORDER BY created_at DESC LIMIT 5`)
+	if err == nil {
+		defer rows3.Close()
+		for rows3.Next() {
+			var m Material
+			rows3.Scan(&m.Title, &m.Description, &m.FilePath, &m.CreatedAt)
+			materials = append(materials, m)
+		}
+	}
 
 	data := struct {
 		Username    string
 		Assignments []Assignment
 		Quizzes     []Quiz
+		Materials   []Material
 	}{
 		Username:    user,
 		Assignments: assignments,
 		Quizzes:     quizzes,
+		Materials:   materials,
 	}
 
 	renderTemplate(w, "student_dashboard", data)
 }
-
-// LogoutHandler clears the session and JWT cookie.
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	delete(session.Values, "username")
@@ -279,8 +273,6 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
-
-// AuthMiddleware verifies the JWT token stored in the cookie.
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("token")
@@ -301,13 +293,9 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r)
 	}
 }
-
-// ------------------ Tutor-specific Handlers ------------------
 func ShowCreateQuizForm(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "create_quiz", nil)
 }
-
-// CreateQuizHandler processes the quiz creation form submission.
 func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	username, ok := session.Values["username"].(string)
@@ -327,12 +315,8 @@ func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("DB error in CreateQuiz:", err)
 		return
 	}
-	// After creating the quiz, redirect to the add-question page.
 	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
 }
-
-// ShowAddQuestionForm renders a form to add a question to an existing quiz
-// and lists the existing questions for that quiz.
 func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
 	quizID := r.URL.Query().Get("quiz_id")
 	qID, err := strconv.Atoi(quizID)
@@ -340,8 +324,6 @@ func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid quiz ID", http.StatusBadRequest)
 		return
 	}
-
-	// Define a structure for quiz questions.
 	type Question struct {
 		ID       int
 		Question string
@@ -359,18 +341,14 @@ func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Error scanning quiz questions", http.StatusInternalServerError)
 				return
 			}
-			// Parse the JSON options
 			if err := json.Unmarshal([]byte(optionsJSON), &q.Options); err != nil {
-				q.Options = []string{} // Fallback if parsing fails.
+				q.Options = []string{}
 			}
 			questions = append(questions, q)
 		}
 	} else {
-		// You might want to log the error; if no rows found, questions will remain empty.
 		fmt.Println("Error fetching questions:", err)
 	}
-
-	// Prepare data to pass to the template.
 	data := struct {
 		QuizID    string
 		Questions []Question
@@ -380,8 +358,6 @@ func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "add_question", data)
 }
-
-// HandleAddQuestion processes the form submission for adding a question.
 func HandleAddQuestion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -410,11 +386,8 @@ func HandleAddQuestion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to add question", http.StatusInternalServerError)
 		return
 	}
-	// Redirect back to the add question form so the tutor can add another question.
 	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
 }
-
-// UploadAssignmentHandler allows a tutor to upload an assignment file.
 func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	username, ok := session.Values["username"].(string)
@@ -470,8 +443,6 @@ func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(w, "Assignment uploaded successfully with ID: %d", assignmentID)
 }
-
-// UploadMaterialHandler allows a tutor to upload study material.
 func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	username, ok := session.Values["username"].(string)
@@ -528,9 +499,6 @@ func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(w, "Material uploaded successfully with ID: %d", materialID)
 }
-
-// ------------------ Student Quiz Handlers ------------------
-
 func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 	quizIDStr := strings.TrimPrefix(r.URL.Path, "/quiz/")
 	quizID, err := strconv.Atoi(quizIDStr)
@@ -560,7 +528,7 @@ func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := json.Unmarshal([]byte(optionsJSON), &q.Options); err != nil {
-			q.Options = []string{} // fallback if parse fails
+			q.Options = []string{}
 		}
 		questions = append(questions, q)
 	}
@@ -574,8 +542,6 @@ func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "attempt_quiz", data)
 }
-
-// SubmitQuizHandler processes the student's quiz attempt.
 func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -638,8 +604,6 @@ func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	if totalQuestions > 0 {
 		score = (float64(correctCount) / float64(totalQuestions)) * 100
 	}
-
-	// Record the quiz attempt into student_quiz_attempts table.
 	err = db.RecordStudentQuiz(studentID, score, totalQuestions, correctCount)
 	if err != nil {
 		http.Error(w, "Error recording quiz attempt", http.StatusInternalServerError)
@@ -657,8 +621,6 @@ func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "quiz_submitted", data)
 }
-
-// TutorProgressHandler allows a tutor to view student quiz attempts.
 func TutorProgressHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	username, ok := session.Values["username"].(string)

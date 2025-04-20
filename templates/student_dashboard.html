@@ -57,23 +57,24 @@
       {{end}}
     </div>
 
-    <!-- Materials Section -->
     <div class="card">
       <h3>📑 Study Materials</h3>
       {{if .Materials}}
         <ul>
-        {{range .Materials}}
-          <li>
-            <strong>{{.Title}}</strong> - {{.Description}}<br>
-            <a href="{{.FilePath}}" target="_blank">View Material</a>
-            <small>Uploaded: {{.CreatedAt}}</small>
-          </li>
-        {{end}}
+          {{range .Materials}}
+            <li>
+              <strong>{{.Title}}</strong> - {{.Description}}<br>
+              <a href="/{{.FilePath}}" download>Download</a> |
+              Uploaded: {{.CreatedAt}}
+            </li>
+          {{end}}
         </ul>
       {{else}}
-        <p>No study materials available yet.</p>
+        <p>No materials uploaded yet.</p>
       {{end}}
     </div>
+    
+    
   </div>
 </body>
 </html>

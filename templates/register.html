@@ -25,15 +25,22 @@
     <form method="POST" action="/register">
       <label for="username">Username:</label>
       <input type="text" name="username" required>
-
+    
       <label for="email">Email:</label>
       <input type="email" name="email" required>
-
+    
       <label for="password">Password:</label>
       <input type="password" name="password" required>
-
+    
+      <label for="role">Register As:</label>
+      <select name="role" required>
+        <option value="student">Student</option>
+        <option value="tutor">Tutor</option>
+      </select>
+    
       <button type="submit">Register</button>
     </form>
+    
   </div>
 </body>
 </html>

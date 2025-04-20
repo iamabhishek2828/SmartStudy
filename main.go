@@ -11,7 +11,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// init loads the environment variables.
 func init() {
 	err := godotenv.Load()
 	if err != nil {
@@ -26,24 +25,18 @@ func main() {
 	defer db.DB.Close()
 
 	mux := http.NewServeMux()
-
-	// Serve static files from the resource folder.
 	fs := http.FileServer(http.Dir("resource"))
 	mux.Handle("/resource/", http.StripPrefix("/resource/", fs))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
-
-	// Route handlers.
 	mux.HandleFunc("/", handlers.HomeHandler)
 	mux.HandleFunc("/register", handlers.RegisterHandler)
 	mux.HandleFunc("/login_check", handlers.LoginCheckHandler)
 	mux.HandleFunc("/login", handlers.LoginHandler)
 	mux.HandleFunc("/dashboard", handlers.AuthMiddleware(handlers.DashboardHandler))
 	mux.HandleFunc("/logout", handlers.LogoutHandler)
-	mux.HandleFunc("/quiz/", handlers.AuthMiddleware(handlers.AttemptQuizHandler)) // e.g., /quiz/123
+	mux.HandleFunc("/quiz/", handlers.AuthMiddleware(handlers.AttemptQuizHandler))
 	mux.HandleFunc("/submit_quiz", handlers.AuthMiddleware(handlers.SubmitQuizHandler))
 	mux.HandleFunc("/tutor_progress", handlers.AuthMiddleware(handlers.TutorProgressHandler))
-
-	// Tutor-specific routes.
 	mux.HandleFunc("/create_quiz_form", handlers.AuthMiddleware(handlers.ShowCreateQuizForm))
 	mux.HandleFunc("/create_quiz", handlers.AuthMiddleware(handlers.CreateQuizHandler))
 	mux.HandleFunc("/upload_assignment", handlers.AuthMiddleware(handlers.UploadAssignmentHandler))
