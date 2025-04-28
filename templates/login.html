@@ -5,9 +5,8 @@
   <title>{{.WebsiteTitle}}</title>
   <link rel="stylesheet" href="/resource/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- CryptoJS for SHA-256 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
@@ -22,36 +21,34 @@
   <div class="container">
     <h2>{{.H1Heading}}</h2>
     <p>{{.BodyParagraphText}}</p>
+
     {{if .PostResponseMessage}}
       <div class="alert">{{.PostResponseMessage}}</div>
     {{end}}
 
-    <form method="POST" action="/login_check">
-      <label>Username:</label>
-      <input name="username" required>
-      <label>Password:</label>
-      <input type="password" name="password" required>
+    <form id="loginForm" method="POST" action="/login_check">
+      <label for="username">Username:</label>
+      <input type="text" name="username" required>
+
+      <label for="password">Password:</label>
+      <input type="password" name="password" id="password" required>
+
       <button type="submit">Login</button>
     </form>
-    
   </div>
 
   <script>
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
+    document.getElementById("loginForm").addEventListener("submit", function(e) {
       e.preventDefault();
-
-      const pwd = document.getElementById('password').value;
-      // Double SHA-256
-      const hash1 = CryptoJS.SHA256(pwd).toString();
-      const hash2 = CryptoJS.SHA256(hash1).toString();
-
-      // Overwrite the password field with the double-hash
-      document.getElementById('password').value = hash2;
-
-      // Now submit to /login_check
+      const pwdInput = document.getElementById("password");
+      const raw = pwdInput.value;
+      const hash = CryptoJS.SHA256(raw).toString(CryptoJS.enc.Hex);
+      pwdInput.value = hash;
       this.submit();
     });
   </script>
 </body>
 </html>
+
+
 

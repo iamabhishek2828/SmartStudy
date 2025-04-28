@@ -1,19 +1,22 @@
 package handlers
 
 import (
-	"SmartStudyBot/db"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
+	"github.com/iamabhishek2828/SmartStudy/db"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/sessions"
@@ -74,83 +77,9 @@ func GenerateJWT(username string) (string, error) {
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "home", nil)
 }
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	data := WebPageData{
-		WebsiteTitle:      "Smart Study Bot - Login",
-		H1Heading:         "Login to Smart Study Bot",
-		BodyParagraphText: "Please enter your login credentials",
-	}
-	renderTemplate(w, "login", data)
-}
-func LoginCheckHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	username := strings.TrimSpace(r.FormValue("username"))
-	password := strings.TrimSpace(r.FormValue("password"))
-	fmt.Printf("Login attempt: username=[%s]\n", username)
-
-	valid, err := db.ValidateUser(username, password)
-	if err != nil {
-		fmt.Println("DB error:", err)
-		http.Error(w, "Server error", http.StatusInternalServerError)
-		return
-	}
-	if !valid {
-		fmt.Printf("Invalid username/password for: %s\n", username)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	var role string
-	err = db.DB.QueryRow("SELECT role FROM users WHERE username = ?", username).Scan(&role)
-	if err != nil {
-		fmt.Println("Error retrieving role:", err)
-		http.Error(w, "Server error", http.StatusInternalServerError)
-		return
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"username": username,
-		"role":     role,
-		"exp":      time.Now().Add(72 * time.Hour).Unix(),
-	})
-	tokenString, err := token.SignedString(jwtKey)
-	if err != nil {
-		fmt.Println("Token generation error:", err)
-		http.Error(w, "Could not login", http.StatusInternalServerError)
-		return
-	}
-
-	session, _ := store.Get(r, "smartstudy-session")
-	session.Values["username"] = username
-	session.Values["authenticatedUser"] = true
-	session.Values["role"] = role
-	err = session.Save(r, w)
-
-	if err != nil {
-		fmt.Println("Session save error:", err)
-		http.Error(w, "Server error", http.StatusInternalServerError)
-		return
-	}
-	fmt.Println("Session saved for:", username)
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "token",
-		Value:    tokenString,
-		Path:     "/",
-		HttpOnly: true,
-		Expires:  time.Now().Add(72 * time.Hour),
-	})
-	fmt.Println("JWT token set for:", username)
-
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
-}
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	data := WebPageData{
-		WebsiteTitle:      "Smart Study Bot - Register",
+		WebsiteTitle:      "Smart Study Bot – Register",
 		H1Heading:         "Register",
 		BodyParagraphText: "Enter your registration details.",
 	}
@@ -159,41 +88,115 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		username := strings.TrimSpace(r.FormValue("username"))
 		email := strings.TrimSpace(r.FormValue("email"))
 		password := strings.TrimSpace(r.FormValue("password"))
-		role := strings.ToLower(strings.TrimSpace(r.FormValue("role")))
+		role := strings.ToLower(r.FormValue("role"))
 		if role != "tutor" && role != "student" {
 			role = "student"
 		}
 
 		id, err := db.CreateUser(username, email, password, role)
 		if err != nil {
-			data.PostResponseMessage = "Registration failed, please contact administrator."
-		} else {
-			data.PostResponseMessage = "Registration successful for " + username + " (" + role + ") with ID: " + strconv.FormatInt(id, 10)
 
+			if me, ok := err.(*mysql.MySQLError); ok && me.Number == 1062 {
+				data.PostResponseMessage = "❌ That username is already taken. Please choose another."
+			} else {
+
+				data.PostResponseMessage = "Registration failed, please contact administrator."
+				fmt.Println("CreateUser error:", err)
+			}
+		} else {
+			data.PostResponseMessage = fmt.Sprintf(
+				"✅ Registration successful for %s (%s) with ID: %d",
+				username, role, id,
+			)
 		}
 	}
 
 	renderTemplate(w, "register", data)
 }
 
-func DashboardHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("DashboardHandler: reached")
-	session, _ := store.Get(r, "smartstudy-session")
-	user, ok := session.Values["username"].(string)
-	role, roleOK := session.Values["role"].(string)
-	if !ok || user == "" || !roleOK || role == "" {
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	data := WebPageData{
+		WebsiteTitle:      "Smart Study Bot - Login",
+		H1Heading:         "Login to Smart Study Bot",
+		BodyParagraphText: "Please enter your login credentials",
+	}
+	renderTemplate(w, "login", data)
+}
+
+func LoginCheckHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	role = strings.ToLower(role)
-	if role == "tutor" {
+	username := strings.TrimSpace(r.FormValue("username"))
+	password := strings.TrimSpace(r.FormValue("password"))
+
+	valid, err := db.ValidateUser(username, password)
+	if err != nil {
+		log.Printf("DB error during login: %v", err)
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	if !valid {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	var role string
+	if err := db.DB.QueryRow(
+		"SELECT role FROM users WHERE username = ?",
+		username,
+	).Scan(&role); err != nil {
+		log.Printf("error retrieving role for %s: %v", username, err)
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": username,
+		"role":     role,
+		"exp":      time.Now().Add(72 * time.Hour).Unix(),
+	}).SignedString(jwtKey)
+	if err != nil {
+		log.Printf("JWT error: %v", err)
+		http.Error(w, "Could not login", http.StatusInternalServerError)
+		return
+	}
+	sess, _ := store.Get(r, "smartstudy-session")
+	sess.Values["username"] = username
+	sess.Values["role"] = role
+	if err := sess.Save(r, w); err != nil {
+		log.Printf("session save error: %v", err)
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  time.Now().Add(72 * time.Hour),
+	})
+
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
+func DashboardHandler(w http.ResponseWriter, r *http.Request) {
+	sess, _ := store.Get(r, "smartstudy-session")
+	user, userOK := sess.Values["username"].(string)
+	role, roleOK := sess.Values["role"].(string)
+	if !userOK || !roleOK || user == "" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	if strings.ToLower(role) == "tutor" {
 		renderTemplate(w, "tutor_dashboard", map[string]string{
 			"Username": user,
-			"Role":     "Tutor",
 		})
 		return
 	}
+
 	type Assignment struct {
 		Title       string
 		Description string
@@ -298,11 +301,14 @@ func ShowCreateQuizForm(w http.ResponseWriter, r *http.Request) {
 }
 func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
-	username, ok := session.Values["username"].(string)
-	if !ok || strings.ToLower(username) != "tutor1" {
+	_, ok := session.Values["username"].(string)
+	role, roleOk := session.Values["role"].(string)
+
+	if !ok || !roleOk || strings.ToLower(role) != "tutor" {
 		http.Error(w, "Unauthorized - Only tutors can create quizzes", http.StatusUnauthorized)
 		return
 	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -389,18 +395,19 @@ func HandleAddQuestion(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
 }
 func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "smartstudy-session")
-	username, ok := session.Values["username"].(string)
-	if !ok || strings.ToLower(username) != "tutor1" {
-		http.Error(w, "Unauthorized - Only tutors can upload assignments", http.StatusUnauthorized)
+	sess, _ := store.Get(r, "smartstudy-session")
+	role, ok := sess.Values["role"].(string)
+	if !ok || strings.ToLower(role) != "tutor" {
+		http.Error(w, "Unauthorized – Only tutors can upload assignments", http.StatusUnauthorized)
 		return
 	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	err := r.ParseMultipartForm(10 << 20)
-	if err != nil {
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, "Error processing form", http.StatusBadRequest)
 		return
 	}
@@ -410,6 +417,7 @@ func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
 	title := r.FormValue("title")
 	description := r.FormValue("description")
 	uploadDir := filepath.Join("uploads", "assignments")
@@ -417,45 +425,50 @@ func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to create upload directory", http.StatusInternalServerError)
 		return
 	}
-	filePath := filepath.Join(uploadDir, header.Filename)
-	out, err := os.Create(filePath)
+
+	dst := filepath.Join(uploadDir, header.Filename)
+	out, err := os.Create(dst)
 	if err != nil {
 		http.Error(w, "Unable to create file on server", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
-	_, err = io.Copy(out, file)
-	if err != nil {
+
+	if _, err := io.Copy(out, file); err != nil {
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
+	username, _ := sess.Values["username"].(string)
 	var tutorID int
-	err = db.DB.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&tutorID)
-	if err != nil {
+	if err := db.DB.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&tutorID); err != nil {
 		http.Error(w, "Error retrieving tutor ID", http.StatusInternalServerError)
 		return
 	}
-	assignmentID, err := db.CreateAssignment(tutorID, title, filePath, description)
+
+	assignmentID, err := db.CreateAssignment(tutorID, title, dst, description)
 	if err != nil {
 		http.Error(w, "Error saving assignment details", http.StatusInternalServerError)
 		fmt.Println("DB error in CreateAssignment:", err)
 		return
 	}
+
 	fmt.Fprintf(w, "Assignment uploaded successfully with ID: %d", assignmentID)
 }
+
 func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "smartstudy-session")
-	username, ok := session.Values["username"].(string)
-	if !ok || strings.ToLower(username) != "tutor1" {
-		http.Error(w, "Unauthorized - Only tutors can upload materials", http.StatusUnauthorized)
+	sess, _ := store.Get(r, "smartstudy-session")
+	role, ok := sess.Values["role"].(string)
+	if !ok || strings.ToLower(role) != "tutor" {
+		http.Error(w, "Unauthorized – Only tutors can upload materials", http.StatusUnauthorized)
 		return
 	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	err := r.ParseMultipartForm(10 << 20)
-	if err != nil {
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, "Error processing form", http.StatusBadRequest)
 		return
 	}
@@ -465,6 +478,7 @@ func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
 	title := r.FormValue("title")
 	description := r.FormValue("description")
 	content := r.FormValue("content")
@@ -473,32 +487,36 @@ func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to create upload directory", http.StatusInternalServerError)
 		return
 	}
-	filePath := filepath.Join(uploadDir, header.Filename)
-	out, err := os.Create(filePath)
+
+	dst := filepath.Join(uploadDir, header.Filename)
+	out, err := os.Create(dst)
 	if err != nil {
 		http.Error(w, "Unable to create file on server", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
-	_, err = io.Copy(out, file)
-	if err != nil {
+
+	if _, err := io.Copy(out, file); err != nil {
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
+	username, _ := sess.Values["username"].(string)
 	var tutorID int
-	err = db.DB.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&tutorID)
-	if err != nil {
+	if err := db.DB.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&tutorID); err != nil {
 		http.Error(w, "Error retrieving tutor ID", http.StatusInternalServerError)
 		return
 	}
-	materialID, err := db.CreateMaterial(tutorID, title, filePath, description, content)
+
+	materialID, err := db.CreateMaterial(tutorID, title, dst, description, content)
 	if err != nil {
 		http.Error(w, "Error saving material details", http.StatusInternalServerError)
 		fmt.Println("DB error in CreateMaterial:", err)
 		return
 	}
+
 	fmt.Fprintf(w, "Material uploaded successfully with ID: %d", materialID)
 }
+
 func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 	quizIDStr := strings.TrimPrefix(r.URL.Path, "/quiz/")
 	quizID, err := strconv.Atoi(quizIDStr)
@@ -622,10 +640,10 @@ func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "quiz_submitted", data)
 }
 func TutorProgressHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "smartstudy-session")
-	username, ok := session.Values["username"].(string)
-	if !ok || strings.ToLower(username) != "tutor1" {
-		http.Error(w, "Unauthorized - Only tutors can view progress", http.StatusUnauthorized)
+	sess, _ := store.Get(r, "smartstudy-session")
+	role, ok := sess.Values["role"].(string)
+	if !ok || strings.ToLower(role) != "tutor" {
+		http.Error(w, "Unauthorized – Only tutors can view progress", http.StatusUnauthorized)
 		return
 	}
 
@@ -639,29 +657,33 @@ func TutorProgressHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	attempts := []QuizAttempt{}
 	query := `
-		SELECT u.username, q.title, a.score, a.total_questions, a.correct_answers, a.submitted_at
-		FROM student_quiz_attempts a
-		JOIN users u ON a.student_id = u.id
-		JOIN quizzes q ON a.quiz_id = q.id
-		ORDER BY a.submitted_at DESC`
-	rows2, err := db.DB.Query(query)
+        SELECT u.username, q.title, a.score, a.total_questions, a.correct_answers, a.submitted_at
+        FROM student_quiz_attempts a
+        JOIN users u ON a.student_id = u.id
+        JOIN quizzes q ON a.quiz_id = q.id
+        ORDER BY a.submitted_at DESC`
+	rows, err := db.DB.Query(query)
 	if err != nil {
 		http.Error(w, "Error retrieving progress data", http.StatusInternalServerError)
 		return
 	}
-	defer rows2.Close()
-	for rows2.Next() {
-		var attempt QuizAttempt
-		if err := rows2.Scan(&attempt.StudentUsername, &attempt.QuizTitle, &attempt.Score, &attempt.TotalQuestions, &attempt.CorrectAnswers, &attempt.SubmittedAt); err != nil {
+	defer rows.Close()
+
+	for rows.Next() {
+		var att QuizAttempt
+		if err := rows.Scan(
+			&att.StudentUsername,
+			&att.QuizTitle,
+			&att.Score,
+			&att.TotalQuestions,
+			&att.CorrectAnswers,
+			&att.SubmittedAt,
+		); err != nil {
 			http.Error(w, "Error scanning progress data", http.StatusInternalServerError)
 			return
 		}
-		attempts = append(attempts, attempt)
+		attempts = append(attempts, att)
 	}
-	data := struct {
-		Attempts []QuizAttempt
-	}{
-		Attempts: attempts,
-	}
-	renderTemplate(w, "tutor_progress", data)
+
+	renderTemplate(w, "tutor_progress", struct{ Attempts []QuizAttempt }{attempts})
 }

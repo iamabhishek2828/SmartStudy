@@ -5,16 +5,15 @@ import (
 	"log"
 	"net/http"
 
-	"SmartStudyBot/db"
-	"SmartStudyBot/handlers"
+	"github.com/iamabhishek2828/SmartStudy/db"
+	"github.com/iamabhishek2828/SmartStudy/handlers"
 
 	"github.com/joho/godotenv"
 )
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Warning: No .env file found; using system environment variables")
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("Warning: no .env file found; using system environment variables")
 	} else {
 		fmt.Println("Loaded .env file successfully.")
 	}
@@ -25,18 +24,30 @@ func main() {
 	defer db.DB.Close()
 
 	mux := http.NewServeMux()
+
+	// static assets
 	fs := http.FileServer(http.Dir("resource"))
 	mux.Handle("/resource/", http.StripPrefix("/resource/", fs))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+
+	// public routes
 	mux.HandleFunc("/", handlers.HomeHandler)
 	mux.HandleFunc("/register", handlers.RegisterHandler)
-	mux.HandleFunc("/login_check", handlers.LoginCheckHandler)
 	mux.HandleFunc("/login", handlers.LoginHandler)
+	mux.HandleFunc("/login_check", handlers.LoginCheckHandler)
+
+	// authenticated routes
 	mux.HandleFunc("/dashboard", handlers.AuthMiddleware(handlers.DashboardHandler))
 	mux.HandleFunc("/logout", handlers.LogoutHandler)
+
+	// student quiz routes
 	mux.HandleFunc("/quiz/", handlers.AuthMiddleware(handlers.AttemptQuizHandler))
 	mux.HandleFunc("/submit_quiz", handlers.AuthMiddleware(handlers.SubmitQuizHandler))
+
+	// tutor progress
 	mux.HandleFunc("/tutor_progress", handlers.AuthMiddleware(handlers.TutorProgressHandler))
+
+	// tutor-only routes
 	mux.HandleFunc("/create_quiz_form", handlers.AuthMiddleware(handlers.ShowCreateQuizForm))
 	mux.HandleFunc("/create_quiz", handlers.AuthMiddleware(handlers.CreateQuizHandler))
 	mux.HandleFunc("/upload_assignment", handlers.AuthMiddleware(handlers.UploadAssignmentHandler))
