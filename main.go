@@ -13,11 +13,13 @@ import (
 
 var DB *sql.DB
 
+// InitDB reads DB_DSN from env and initializes the global DB handle.
 func InitDB() {
 	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
 		log.Fatal("DB_DSN environment variable not set")
 	}
+
 	var err error
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
