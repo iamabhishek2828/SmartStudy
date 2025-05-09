@@ -1,35 +1,13 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/iamabhishek2828/SmartStudy/db"
 	"github.com/iamabhishek2828/SmartStudy/handlers"
 )
-
-var DB *sql.DB
-
-// InitDB reads DB_DSN from env and initializes the global DB handle.
-func InitDB() {
-	dsn := os.Getenv("DB_DSN")
-	if dsn == "" {
-		log.Fatal("DB_DSN environment variable not set")
-	}
-
-	var err error
-	DB, err = sql.Open("mysql", dsn)
-	if err != nil {
-		log.Fatal("Error opening DB:", err)
-	}
-	if err = DB.Ping(); err != nil {
-		log.Fatal("Error pinging DB:", err)
-	}
-	log.Println("Connected to MySQL database!")
-}
 
 func main() {
 	db.InitDB()

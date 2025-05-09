@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -14,7 +15,10 @@ import (
 var DB *sql.DB
 
 func InitDB() {
-	dsn := "root:Abhi@2828@tcp(127.0.0.1:3306)/smartstudy?parseTime=true"
+	dsn := os.Getenv("DB_DSN")
+	if dsn == "" {
+		log.Fatal("DB_DSN environment variable not set")
+	}
 	var err error
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
@@ -23,9 +27,8 @@ func InitDB() {
 	if err = DB.Ping(); err != nil {
 		log.Fatal("Error pinging DB:", err)
 	}
-	fmt.Println("Connected to MySQL database!")
+	log.Println("Connected to MySQL database!")
 }
-
 func CreateUser(username, email, password, role string) (int64, error) {
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
