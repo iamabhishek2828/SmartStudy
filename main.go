@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,16 +9,24 @@ import (
 
 	"github.com/iamabhishek2828/SmartStudy/db"
 	"github.com/iamabhishek2828/SmartStudy/handlers"
-	"github.com/joho/godotenv"
 )
 
-func init() {
-	if os.Getenv("RENDER") == "" {
-		_ = godotenv.Load()
-		fmt.Println("Loaded .env file from disk (local development).")
-	} else {
-		fmt.Println("Running on Render, using environment variables from dashboard.")
+var DB *sql.DB
+
+func InitDB() {
+	dsn := os.Getenv("DB_DSN")
+	if dsn == "" {
+		log.Fatal("DB_DSN environment variable not set")
 	}
+	var err error
+	DB, err = sql.Open("mysql", dsn)
+	if err != nil {
+		log.Fatal("Error opening DB:", err)
+	}
+	if err = DB.Ping(); err != nil {
+		log.Fatal("Error pinging DB:", err)
+	}
+	log.Println("Connected to MySQL database!")
 }
 
 func main() {
