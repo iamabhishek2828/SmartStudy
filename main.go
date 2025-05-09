@@ -7,18 +7,13 @@ import (
 
 	"github.com/iamabhishek2828/SmartStudy/db"
 	"github.com/iamabhishek2828/SmartStudy/handlers"
-
-	"github.com/joho/godotenv"
 )
 
 func init() {
-	if err := godotenv.Load(); err != nil {
-		fmt.Println("Warning: no .env file found; using system environment variables")
-	} else {
+	{
 		fmt.Println("Loaded .env file successfully.")
 	}
 }
-
 func main() {
 	db.InitDB()
 	defer db.DB.Close()
