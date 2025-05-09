@@ -4,12 +4,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/iamabhishek2828/SmartStudy/db"
 	"github.com/iamabhishek2828/SmartStudy/handlers"
+	"github.com/joho/godotenv"
 )
 
 func init() {
+	if os.Getenv("RENDER") == "" {
+		_ = godotenv.Load()
+	}
 	{
 		fmt.Println("Loaded .env file successfully.")
 	}
