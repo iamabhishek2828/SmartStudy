@@ -14,11 +14,12 @@ import (
 func init() {
 	if os.Getenv("RENDER") == "" {
 		_ = godotenv.Load()
-	}
-	{
-		fmt.Println("Loaded .env file successfully.")
+		fmt.Println("Loaded .env file from disk (local development).")
+	} else {
+		fmt.Println("Running on Render, using environment variables from dashboard.")
 	}
 }
+
 func main() {
 	db.InitDB()
 	defer db.DB.Close()
