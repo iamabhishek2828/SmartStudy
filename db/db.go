@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
@@ -76,11 +77,11 @@ func AddQuestionToQuiz(quizID int64, question string, options []string, correctO
 	)
 	return err
 }
-func CreateAssignment(tutorID int, title, filePath, description string) (int64, error) {
+func CreateAssignment(tutorID int, title, filePath, description string, dueDate time.Time) (int64, error) {
 	res, err := DB.Exec(
-		`INSERT INTO assignments (tutor_id, title, file_path, description, created_at)
-		 VALUES (?, ?, ?, ?, NOW())`,
-		tutorID, title, filePath, description,
+		`INSERT INTO assignments (tutor_id, title, file_path, description, due_date, created_at)
+		 VALUES (?, ?, ?, ?, ?, NOW())`,
+		tutorID, title, filePath, description, dueDate,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("error creating assignment: %v", err)
@@ -107,11 +108,11 @@ func RecordStudentQuiz(studentID int, score float64, totalQ, correctAns int) err
 	)
 	return err
 }
-func RecordStudentQuizAttempt(studentID, quizID int, score float64, totalQ, correctAns int) error {
+func RecordStudentQuizAttempt(studentID, quizID int, score float64, totalQuestions, correctAnswers int) error {
 	_, err := DB.Exec(
 		`INSERT INTO student_quiz_attempts (student_id, quiz_id, score, total_questions, correct_answers, submitted_at)
 		 VALUES (?, ?, ?, ?, ?, NOW())`,
-		studentID, quizID, score, totalQ, correctAns,
+		studentID, quizID, score, totalQuestions, correctAnswers,
 	)
 	return err
 }

@@ -2,70 +2,196 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Student Dashboard - Smart Study Bot</title>
+  <title>Student Dashboard – Smart Study Bot</title>
   <link rel="stylesheet" href="/resource/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Navbar */
+    header {
+      background: #2c3e50;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Roboto', sans-serif;
+    }
+    header h1 { margin: 0; font-size: 1.5rem; }
+    nav { display: flex; gap: 1rem; align-items: center; }
+    nav a, nav button {
+      color: #ecf0f1;
+      background: none;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    /* Dropdown */
+    .dropdown { position: relative; }
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: none;
+      min-width: 180px;
+      z-index: 10;
+    }
+    .dropdown-menu a {
+      display: block;
+      padding: 10px 15px;
+      color: #333;
+      text-decoration: none;
+    }
+    .dropdown-menu a:hover { background: #f4f7f8; }
+
+    /* Container */
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      text-align: center;
+      font-family: 'Roboto', sans-serif;
+    }
+    .hero {
+      background: #3498db;
+      color: #fff;
+      height: 120px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .dashboard-image {
+      margin: 20px auto;
+      text-align: center;
+    }
+    .dashboard-image img {
+      max-width: 210px;
+      width: 100%;
+      border-radius: 12px;
+    }
+
+    /* Cards */
+    .card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      text-align: left;
+      display: none;
+    }
+    .card h3 { margin-top: 0; }
+  </style>
 </head>
 <body>
   <header>
     <h1>Smart Study Bot</h1>
     <nav>
-      <a href="/dashboard">Dashboard</a> |
+      <a href="/dashboard">Dashboard</a>
+      <div class="dropdown">
+        <button id="manageBtn" type="button">Manage ▼</button>
+        <div class="dropdown-menu" id="manageMenu">
+          <a href="#" data-show="studyPlanCard">Study Plan</a>
+          <a href="#" data-show="assignmentsCard">Assignments</a>
+          <a href="#" data-show="quizzesCard">Quizzes</a>
+          <a href="#" data-show="materialsCard">Materials</a>
+        </div>
+      </div>
       <a href="/logout">Logout</a>
     </nav>
   </header>
+
   <div class="container">
-    <h2>Welcome, {{.Username}} (Student)</h2>
-    
-    <!-- Study Plan Section (as before) -->
-    <div class="card">
-      <h3>📚 Today’s Study Plan</h3>
-      <p>You have 2 hours of Mathematics and 1 hour of Literature today.</p>
+    <div class="hero">
+      Welcome, {{.Username}} (Student)
     </div>
-    
-    <!-- Assignments Section -->
-    <div class="card">
+    <div class="dashboard-image">
+      <img src="https://img.freepik.com/premium-photo/cartoon-boy-with-backpack-book-hand_958108-100249.jpg?semt=ais_hybrid&w=740"
+           alt="Student in action">
+    </div>
+
+    <!-- Study Plan -->
+    <div class="card" id="studyPlanCard">
+      <h3>📚 Today’s Study Plan</h3>
+      {{if .StudyPlans}}
+        <ul>
+          {{range .StudyPlans}}
+            <li>{{.PlanDetails}} (Exam Date: {{.ExamDate.Format "2006-01-02"}})</li>
+          {{end}}
+        </ul>
+      {{else}}
+        <p>No study plan for today.</p>
+      {{end}}
+    </div>
+
+    <!-- Assignments -->
+    <div class="card" id="assignmentsCard">
       <h3>📝 Upcoming Assignments</h3>
       {{if .Assignments}}
         <ul>
-        {{range .Assignments}}
-          <li>
-            <strong>{{.Title}}</strong> - {{.Description}}<br>
-            <a href="{{.FilePath}}" download>Download</a>
-            <small>Uploaded: {{.CreatedAt}}</small>
-          </li>
-        {{end}}
+          {{range .Assignments}}
+            <li>
+              <strong>{{.Title}}</strong> – {{.Description}}<br>
+              <a href="{{.FilePath}}" download>Download Assignment</a><br>
+              {{if .Submission}}
+                <!-- Already submitted -->
+                <em>Submitted on {{.Submission.CreatedAt.Format "2006-01-02 15:04"}}</em>
+                {{if .Submission.Grade}}
+                  <br>Grade: {{.Submission.Grade}} – Feedback: {{.Submission.Feedback}}
+                {{end}}
+              {{else}}
+                <!-- Not yet submitted, and before due date -->
+                {{if lt (now) .DueDate}}
+                  <form action="/submit_assignment" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="assignment_id" value="{{.ID}}">
+                    <input type="file" name="submissionFile" required>
+                    <button type="submit">Submit Assignment</button>
+                  </form>
+                {{else}}
+                  <em>Submission closed on {{.DueDate.Format "2006-01-02"}}</em>
+                {{end}}
+              {{end}}
+            </li>
+          {{end}}
         </ul>
       {{else}}
         <p>No assignments uploaded yet.</p>
       {{end}}
     </div>
 
-    <!-- Quizzes Section -->
-    <div class="card">
+    <!-- Quizzes -->
+    <div class="card" id="quizzesCard">
       <h3>❓ Available Quizzes</h3>
       {{if .Quizzes}}
         <ul>
-        {{range .Quizzes}}
-          <li>
-            <strong>{{.Title}}</strong> (Created: {{.CreatedAt}}) - 
-            <a href="/quiz/{{.ID}}">Attempt Quiz</a>
-          </li>
-        {{end}}
+          {{range .Quizzes}}
+            <li>
+              <strong>{{.Title}}</strong> (Created: {{.CreatedAt}}) –
+              <a href="/quiz/{{.ID}}">Attempt Quiz</a>
+            </li>
+          {{end}}
         </ul>
       {{else}}
         <p>No quizzes available.</p>
       {{end}}
     </div>
 
-    <div class="card">
+    <!-- Materials -->
+    <div class="card" id="materialsCard">
       <h3>📑 Study Materials</h3>
       {{if .Materials}}
         <ul>
           {{range .Materials}}
             <li>
-              <strong>{{.Title}}</strong> - {{.Description}}<br>
-              <a href="/{{.FilePath}}" download>Download</a> |
-              Uploaded: {{.CreatedAt}}
+              <strong>{{.Title}}</strong> – {{.Description}}<br>
+              <a href="{{.FilePath}}" download>Download</a>
+              <small>Uploaded: {{.CreatedAt}}</small>
             </li>
           {{end}}
         </ul>
@@ -73,8 +199,38 @@
         <p>No materials uploaded yet.</p>
       {{end}}
     </div>
-    
-    
   </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn  = document.getElementById('manageBtn');
+      const menu = document.getElementById('manageMenu');
+
+      // Toggle dropdown
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      });
+
+      // Close when clicking outside
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.dropdown')) {
+          menu.style.display = 'none';
+        }
+      });
+
+      // Show the right card
+      document.querySelectorAll('#manageMenu a').forEach(link => {
+        link.addEventListener('click', e => {
+          e.preventDefault();
+          // hide all
+          document.querySelectorAll('.card').forEach(c => c.style.display = 'none');
+          // show selected
+          document.getElementById(link.dataset.show).style.display = 'block';
+          menu.style.display = 'none';
+        });
+      });
+    });
+  </script>
 </body>
 </html>

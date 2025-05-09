@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -49,15 +50,45 @@ type WebPageData struct {
 	PosrResponseHTTPResponseCode string
 }
 
+type Submission struct {
+	CreatedAt time.Time
+	Grade     string
+	Feedback  string
+}
+
+type Assignment struct {
+	ID          int
+	Title       string
+	Description string
+	FilePath    string
+	CreatedAt   string
+	DueDate     time.Time
+	Submission  *Submission
+}
+
+type StudyPlan struct {
+	PlanDetails string
+	ExamDate    time.Time
+}
+
 func renderTemplate(w http.ResponseWriter, tmpl string, data any) {
+	funcMap := template.FuncMap{
+		"now": time.Now,
+		"lt":  func(a, b time.Time) bool { return a.Before(b) },
+	}
 	tmplPath := filepath.Join("templates", tmpl+".html")
-	t, err := template.ParseFiles(tmplPath)
+	t, err := template.New(filepath.Base(tmplPath)).Funcs(funcMap).ParseFiles(tmplPath)
 	if err != nil {
 		http.Error(w, "Error loading template", http.StatusInternalServerError)
+		fmt.Println("TEMPLATE ERROR:", err)
 		return
 	}
-	t.Execute(w, data)
+	if err := t.Execute(w, data); err != nil {
+		http.Error(w, "Error executing template", http.StatusInternalServerError)
+		fmt.Println("TEMPLATE EXEC ERROR:", err)
+	}
 }
+
 func generateRandomString(length int) string {
 	bytes := make([]byte, length)
 	_, err := rand.Read(bytes)
@@ -66,6 +97,7 @@ func generateRandomString(length int) string {
 	}
 	return hex.EncodeToString(bytes)
 }
+
 func GenerateJWT(username string) (string, error) {
 	claims := jwt.MapClaims{
 		"username": username,
@@ -74,9 +106,11 @@ func GenerateJWT(username string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
 }
+
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "home", nil)
 }
+
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	data := WebPageData{
 		WebsiteTitle:      "Smart Study Bot – Register",
@@ -95,11 +129,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 		id, err := db.CreateUser(username, email, password, role)
 		if err != nil {
-
 			if me, ok := err.(*mysql.MySQLError); ok && me.Number == 1062 {
 				data.PostResponseMessage = "❌ That username is already taken. Please choose another."
 			} else {
-
 				data.PostResponseMessage = "Registration failed, please contact administrator."
 				fmt.Println("CreateUser error:", err)
 			}
@@ -191,18 +223,52 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.ToLower(role) == "tutor" {
-		renderTemplate(w, "tutor_dashboard", map[string]string{
-			"Username": user,
+		assignments := []Assignment{}
+		rows, err := db.DB.Query(`SELECT id, title, description FROM assignments WHERE tutor_id = (SELECT id FROM users WHERE username = ?)`, user)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var a Assignment
+				rows.Scan(&a.ID, &a.Title, &a.Description)
+				assignments = append(assignments, a)
+			}
+		}
+		type RecentSubmission struct {
+			AssignmentID    int
+			AssignmentTitle string
+			Student         string
+			FilePath        string
+		}
+		recentSubmissions := []RecentSubmission{}
+		rows2, err := db.DB.Query(`
+			SELECT s.assignment_id, a.title, u.username, s.file_path
+			FROM submissions s
+			JOIN assignments a ON s.assignment_id = a.id
+			JOIN users u ON s.student_id = u.id
+			WHERE a.tutor_id = (SELECT id FROM users WHERE username = ?)
+			ORDER BY s.submitted_at DESC LIMIT 5
+		`, user)
+		if err == nil {
+			defer rows2.Close()
+			for rows2.Next() {
+				var rs RecentSubmission
+				rows2.Scan(&rs.AssignmentID, &rs.AssignmentTitle, &rs.Student, &rs.FilePath)
+				recentSubmissions = append(recentSubmissions, rs)
+			}
+		}
+
+		renderTemplate(w, "tutor_dashboard", struct {
+			Username          string
+			Assignments       []Assignment
+			RecentSubmissions []RecentSubmission
+		}{
+			Username:          user,
+			Assignments:       assignments,
+			RecentSubmissions: recentSubmissions,
 		})
 		return
 	}
 
-	type Assignment struct {
-		Title       string
-		Description string
-		FilePath    string
-		CreatedAt   string
-	}
 	type Quiz struct {
 		ID        int
 		Title     string
@@ -216,12 +282,12 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	assignments := []Assignment{}
-	rows, err := db.DB.Query(`SELECT title, description, file_path, created_at FROM assignments ORDER BY created_at DESC LIMIT 5`)
+	rows, err := db.DB.Query(`SELECT id, title, description, file_path, created_at, due_date FROM assignments ORDER BY created_at DESC LIMIT 5`)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var a Assignment
-			rows.Scan(&a.Title, &a.Description, &a.FilePath, &a.CreatedAt)
+			rows.Scan(&a.ID, &a.Title, &a.Description, &a.FilePath, &a.CreatedAt, &a.DueDate)
 			assignments = append(assignments, a)
 		}
 	}
@@ -246,21 +312,44 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 			materials = append(materials, m)
 		}
 	}
+	var studentID int
+	err = db.DB.QueryRow("SELECT id FROM users WHERE username = ?", user).Scan(&studentID)
+	if err != nil {
+		studentID = 0
+	}
+
+	plans := []StudyPlan{}
+	rows4, err := db.DB.Query(`
+		SELECT plan_details, exam_date 
+		FROM study_plans 
+		WHERE student_id = ? AND exam_date = CURDATE()
+	`, studentID)
+	if err == nil {
+		defer rows4.Close()
+		for rows4.Next() {
+			var sp StudyPlan
+			rows4.Scan(&sp.PlanDetails, &sp.ExamDate)
+			plans = append(plans, sp)
+		}
+	}
 
 	data := struct {
 		Username    string
 		Assignments []Assignment
 		Quizzes     []Quiz
 		Materials   []Material
+		StudyPlans  []StudyPlan
 	}{
 		Username:    user,
 		Assignments: assignments,
 		Quizzes:     quizzes,
 		Materials:   materials,
+		StudyPlans:  plans,
 	}
 
 	renderTemplate(w, "student_dashboard", data)
 }
+
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	delete(session.Values, "username")
@@ -276,6 +365,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
+
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("token")
@@ -296,9 +386,11 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r)
 	}
 }
+
 func ShowCreateQuizForm(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "create_quiz", nil)
 }
+
 func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "smartstudy-session")
 	_, ok := session.Values["username"].(string)
@@ -323,6 +415,7 @@ func CreateQuizHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
 }
+
 func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
 	quizID := r.URL.Query().Get("quiz_id")
 	qID, err := strconv.Atoi(quizID)
@@ -364,6 +457,7 @@ func ShowAddQuestionForm(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "add_question", data)
 }
+
 func HandleAddQuestion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -394,6 +488,7 @@ func HandleAddQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, fmt.Sprintf("/add_question?quiz_id=%d", quizID), http.StatusSeeOther)
 }
+
 func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 	sess, _ := store.Get(r, "smartstudy-session")
 	role, ok := sess.Values["role"].(string)
@@ -420,6 +515,12 @@ func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 
 	title := r.FormValue("title")
 	description := r.FormValue("description")
+	dueDateStr := r.FormValue("due_date")
+	dueDate, err := time.Parse("2006-01-02", dueDateStr)
+	if err != nil {
+		http.Error(w, "Invalid due date", http.StatusBadRequest)
+		return
+	}
 	uploadDir := filepath.Join("uploads", "assignments")
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		http.Error(w, "Unable to create upload directory", http.StatusInternalServerError)
@@ -445,7 +546,7 @@ func UploadAssignmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assignmentID, err := db.CreateAssignment(tutorID, title, dst, description)
+	assignmentID, err := db.CreateAssignment(tutorID, title, dst, description, dueDate)
 	if err != nil {
 		http.Error(w, "Error saving assignment details", http.StatusInternalServerError)
 		fmt.Println("DB error in CreateAssignment:", err)
@@ -517,6 +618,68 @@ func UploadMaterialHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Material uploaded successfully with ID: %d", materialID)
 }
 
+func SubmitAssignmentHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	session, _ := store.Get(r, "smartstudy-session")
+	username, ok := session.Values["username"].(string)
+	if !ok || username == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var studentID int
+	if err := db.DB.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&studentID); err != nil {
+		http.Error(w, "Error retrieving student ID", http.StatusInternalServerError)
+		return
+	}
+	assignmentID, err := strconv.Atoi(r.FormValue("assignment_id"))
+	if err != nil {
+		http.Error(w, "Invalid assignment ID", http.StatusBadRequest)
+		return
+	}
+	fmt.Println("DEBUG: Submitting assignment", assignmentID, "for student", studentID)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Error processing form", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("submissionFile")
+	if err != nil {
+		http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	uploadDir := filepath.Join("uploads", "submissions")
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		http.Error(w, "Unable to create upload directory", http.StatusInternalServerError)
+		return
+	}
+	dst := filepath.Join(uploadDir, fmt.Sprintf("%d_%s", studentID, header.Filename))
+	out, err := os.Create(dst)
+	if err != nil {
+		http.Error(w, "Unable to create file on server", http.StatusInternalServerError)
+		return
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, file); err != nil {
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
+		return
+	}
+	res, err := db.DB.Exec(
+		`INSERT INTO submissions (assignment_id, student_id, file_path, submitted_at) VALUES (?, ?, ?, NOW())`,
+		assignmentID, studentID, dst,
+	)
+	if err != nil {
+		fmt.Println("DEBUG: Error saving submission:", err)
+		http.Error(w, "Error saving submission", http.StatusInternalServerError)
+		return
+	}
+	id, _ := res.LastInsertId()
+	fmt.Println("DEBUG: Submission saved with ID", id)
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
 func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 	quizIDStr := strings.TrimPrefix(r.URL.Path, "/quiz/")
 	quizID, err := strconv.Atoi(quizIDStr)
@@ -560,6 +723,7 @@ func AttemptQuizHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "attempt_quiz", data)
 }
+
 func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -622,7 +786,7 @@ func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	if totalQuestions > 0 {
 		score = (float64(correctCount) / float64(totalQuestions)) * 100
 	}
-	err = db.RecordStudentQuiz(studentID, score, totalQuestions, correctCount)
+	err = db.RecordStudentQuizAttempt(studentID, quizID, score, totalQuestions, correctCount)
 	if err != nil {
 		http.Error(w, "Error recording quiz attempt", http.StatusInternalServerError)
 		return
@@ -639,6 +803,7 @@ func SubmitQuizHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	renderTemplate(w, "quiz_submitted", data)
 }
+
 func TutorProgressHandler(w http.ResponseWriter, r *http.Request) {
 	sess, _ := store.Get(r, "smartstudy-session")
 	role, ok := sess.Values["role"].(string)
@@ -686,4 +851,112 @@ func TutorProgressHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderTemplate(w, "tutor_progress", struct{ Attempts []QuizAttempt }{attempts})
+}
+
+func ViewSubmissionsHandler(w http.ResponseWriter, r *http.Request) {
+	assignmentIDStr := r.URL.Query().Get("assignment_id")
+	assignmentID, err := strconv.Atoi(assignmentIDStr)
+	if err != nil {
+		http.Error(w, "Invalid assignment ID", http.StatusBadRequest)
+		return
+	}
+
+	type SubmissionRow struct {
+		ID          int
+		Student     string
+		FilePath    string
+		SubmittedAt string
+		Evaluated   bool
+		Marks       sql.NullInt64
+		Feedback    sql.NullString
+	}
+
+	rows, err := db.DB.Query(`
+        SELECT s.id, u.username, s.file_path, s.submitted_at, s.evaluated, s.marks, s.feedback
+        FROM submissions s
+        JOIN users u ON s.student_id = u.id
+        WHERE s.assignment_id = ?
+    `, assignmentID)
+	if err != nil {
+		http.Error(w, "Error fetching submissions", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var submissions []SubmissionRow
+	for rows.Next() {
+		var s SubmissionRow
+		if err := rows.Scan(&s.ID, &s.Student, &s.FilePath, &s.SubmittedAt, &s.Evaluated, &s.Marks, &s.Feedback); err != nil {
+			http.Error(w, "Error scanning submissions", http.StatusInternalServerError)
+			return
+		}
+		submissions = append(submissions, s)
+	}
+
+	data := struct {
+		AssignmentID int
+		Submissions  []SubmissionRow
+	}{
+		AssignmentID: assignmentID,
+		Submissions:  submissions,
+	}
+
+	renderTemplate(w, "view_submissions", data)
+}
+
+func EvaluateSubmissionHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	submissionID, _ := strconv.Atoi(r.FormValue("submission_id"))
+	marks, _ := strconv.Atoi(r.FormValue("marks"))
+	feedback := r.FormValue("feedback")
+
+	_, err := db.DB.Exec(`UPDATE submissions SET evaluated=1, marks=?, feedback=? WHERE id=?`, marks, feedback, submissionID)
+	if err != nil {
+		http.Error(w, "Failed to update submission", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, r.Header.Get("Referer"), http.StatusSeeOther)
+}
+
+func PostStudyPlanHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	sess, _ := store.Get(r, "smartstudy-session")
+	role, ok := sess.Values["role"].(string)
+	if !ok || strings.ToLower(role) != "tutor" {
+		http.Error(w, "Unauthorized – Only tutors can post study plans", http.StatusUnauthorized)
+		return
+	}
+
+	studentUsername := r.FormValue("student_username")
+	planDetails := r.FormValue("plan_details")
+	examDateStr := r.FormValue("exam_date")
+	examDate, err := time.Parse("2006-01-02", examDateStr)
+	if err != nil {
+		http.Error(w, "Invalid exam date", http.StatusBadRequest)
+		return
+	}
+
+	var studentID int
+	err = db.DB.QueryRow("SELECT id FROM users WHERE username = ?", studentUsername).Scan(&studentID)
+	if err != nil {
+		http.Error(w, "Student not found", http.StatusBadRequest)
+		return
+	}
+
+	_, err = db.DB.Exec(
+		`INSERT INTO study_plans (student_id, plan_details, exam_date) VALUES (?, ?, ?)`,
+		studentID, planDetails, examDate,
+	)
+	if err != nil {
+		http.Error(w, "Failed to post study plan", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }

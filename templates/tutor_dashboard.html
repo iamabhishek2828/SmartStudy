@@ -2,132 +2,197 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tutor Dashboard - Smart Study Bot</title>
+  <title>Tutor Dashboard – Smart Study Bot</title>
   <link rel="stylesheet" href="/resource/css/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: 'Roboto', sans-serif;
-      background: #f4f7f8;
-      margin: 0;
-      padding: 20px;
-    }
+    /* Navbar */
     header {
       background: #2c3e50;
-      color: #fff;
       padding: 10px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-family: 'Roboto', sans-serif;
     }
-    header h1 {
-      margin: 0;
+    header h1 { margin: 0; font-size: 1.5rem; }
+    nav { display: flex; gap: 1rem; align-items: center; }
+    nav a, nav button {
+      color:rgb(244, 247, 248); background: none; border: none;
+      font-size: 1rem; cursor: pointer; text-decoration: none;
     }
-    nav a {
-      color: #ecf0f1;
-      margin-right: 15px;
-      text-decoration: none;
+    /* Dropdown */
+    .dropdown { position: relative; }
+    .dropdown-menu {
+      position: absolute; top: 100%; right: 0;
+      background: #fff; border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: none; min-width: 180px; z-index: 10;
     }
+    .dropdown-menu a {
+      display: block; padding: 10px 15px;
+      color: #333; text-decoration: none;
+    }
+    .dropdown-menu a:hover { background: #f4f7f8; }
+    /* Container */
     .container {
-      max-width: 900px;
-      margin: 20px auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 900px; margin: 30px auto;
+      text-align: center; font-family: 'Roboto', sans-serif;
+    }
+    .hero {
+      background: url('/resource/img/teacher-hero.jpg') center/cover no-repeat;
+      height: 200px; border-radius: 12px; margin-bottom: 30px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.4);
     }
     .card {
-      background-color: #ecf0f1;
-      margin-bottom: 20px;
-      padding: 15px;
-      border-radius: 8px;
+      background: #fff; padding: 20px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;
+      text-align: left; display: none;
     }
-    .card h3 {
-      margin-top: 0;
+    .card h3 { margin-top: 0; }
+    .btn { 
+      background: #27ae60; color: #fff; padding: 10px 15px;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-size: 1rem;
     }
-    .btn {
-      display: inline-block;
-      padding: 10px 15px;
-      background-color: #3498db;
-      color: #fff;
-      text-decoration: none;
-      border-radius: 4px;
-      margin-top: 10px;
-    }
-    .btn:hover {
-      background-color: #2980b9;
-    }
-    form input[type="text"],
-    form textarea {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    form input[type="file"] {
-      margin: 10px 0;
-    }
-    form button {
-      background-color: #27ae60;
-      color: #fff;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    form button:hover {
-      background-color: #219150;
-    }
+    .btn:hover { background: #219150; }
   </style>
 </head>
 <body>
   <header>
     <h1>Smart Study Bot</h1>
     <nav>
-      <a href="/dashboard">Dashboard</a> |
-      <a href="/logout">Logout</a> |
+      <a href="/dashboard">Dashboard</a>
       <a href="/tutor_progress">View Student Performance</a>
+
+      <div class="dropdown">
+        <button id="manageBtn">Manage ▼</button>
+        <div class="dropdown-menu" id="manageMenu">
+          <a href="#" data-show="quizCard">Create Quiz</a>
+          <a href="#" data-show="assignCard">Upload Assignment</a>
+          <a href="#" data-show="materialCard">Upload Material</a>
+          <a href="#" data-show="assignmentListCard">Assignments</a>
+          <a href="#" data-show="recentSubmissionsCard">Recent Student Submissions</a>
+          <a href="#" data-show="studyPlanCard">Post Study Plan</a>
+        </div>
+      </div>
+
+      <a href="/logout">Logout</a>
     </nav>
   </header>
-  <div class="container">
-    <h2>Welcome, {{.Username}} (Tutor)</h2>
 
-    <!-- Quiz Creation -->
-    <div class="card">
+  <div class="container">
+    <div class="hero">
+      Welcome, {{.Username}} (Tutor)
+    </div>
+
+    <!-- New dashboard image to enhance UI -->
+    <div class="dashboard-image" style="margin: 20px auto; text-align: center;">
+      <img src="https://img.freepik.com/premium-photo/male-teacher-with-book-standing-front-blackboard-man-speaking-teaching_743758-1690.jpg?semt=ais_hybrid&w=740" 
+           alt="Teacher in action" 
+           style="max-width: 210px; width: 100%; border-radius: 12px;">
+    </div>
+
+    <!-- Create Quiz Card -->
+    <div class="card" id="quizCard">
       <h3>Create New Quiz</h3>
       <form action="/create_quiz" method="POST">
-        <input type="text" name="title" placeholder="Quiz Title" required>
-        <button type="submit">Create Quiz</button>
+        <input type="text" name="title" placeholder="Quiz Title" required style="width:100%; padding:8px; margin-bottom:10px;">
+        <button class="btn" type="submit">Create Quiz</button>
       </form>
     </div>
 
-    <!-- Assignment Upload -->
-    <div class="card">
+    <!-- Upload Assignment Card -->
+    <div class="card" id="assignCard">
       <h3>Upload Assignment</h3>
       <form action="/upload_assignment" method="POST" enctype="multipart/form-data">
-        <input type="text" name="title" placeholder="Assignment Title" required>
-        <textarea name="description" placeholder="Description" required></textarea>
-        <input type="file" name="assignmentFile" required>
-        <button type="submit">Upload Assignment</button>
+        <input type="text" name="title" placeholder="Assignment Title" required style="width:100%; padding:8px; margin-bottom:10px;">
+        <textarea name="description" placeholder="Description" required style="width:100%; padding:8px; margin-bottom:10px;"></textarea>
+        <input type="file" name="assignmentFile" required style="margin-bottom:10px;">
+        <input type="date" name="due_date" required style="margin-bottom:10px;">
+        <button class="btn" type="submit">Upload Assignment</button>
       </form>
     </div>
 
-    <!-- Material Upload -->
-    <div class="card">
+    <!-- Upload Material Card -->
+    <div class="card" id="materialCard">
       <h3>Upload Study Material</h3>
       <form action="/upload_material" method="POST" enctype="multipart/form-data">
-        <input type="text" name="title" placeholder="Material Title" required>
-        <textarea name="description" placeholder="Description" required></textarea>
-        <textarea name="content" placeholder="Additional Content (optional)"></textarea>
-        <input type="file" name="materialFile" required>
-        <button type="submit">Upload Material</button>
+        <input type="text" name="title" placeholder="Material Title" required style="width:100%; padding:8px; margin-bottom:10px;">
+        <textarea name="description" placeholder="Description" required style="width:100%; padding:8px; margin-bottom:10px;"></textarea>
+        <textarea name="content" placeholder="Additional Content (optional)" style="width:100%; padding:8px; margin-bottom:10px;"></textarea>
+        <input type="file" name="materialFile" required style="margin-bottom:10px;">
+        <button class="btn" type="submit">Upload Material</button>
       </form>
     </div>
 
-    <!-- Link to Tutor Progress -->
-    <div class="card">
-      <h3>Review Student Performance</h3>
-      <p>Click the button below to view the quiz attempts and progress of your students.</p>
-      <a class="btn" href="/tutor_progress">View Student Performance</a>
+    <!-- Assignment List for Evaluation -->
+    <div class="card" id="assignmentListCard">
+      <h3>Assignments</h3>
+      {{if .Assignments}}
+        <ul>
+          {{range .Assignments}}
+            <li>
+              <strong>{{.Title}}</strong> – {{.Description}}
+              <a href="/view_submissions?assignment_id={{.ID}}" style="margin-left:10px;">View Submissions</a>
+            </li>
+          {{end}}
+        </ul>
+      {{else}}
+        <p>No assignments uploaded yet.</p>
+      {{end}}
+    </div>
+
+    <!-- Recent Student Submissions (optional) -->
+    <div class="card" id="recentSubmissionsCard">
+      <h3>Recent Student Submissions</h3>
+      {{if .RecentSubmissions}}
+        <ul>
+          {{range .RecentSubmissions}}
+            <li>
+              <strong>{{.AssignmentTitle}}</strong> by {{.Student}}
+              <a href="/{{.FilePath}}" download>Download</a>
+              <a href="/view_submissions?assignment_id={{.AssignmentID}}">Evaluate</a>
+            </li>
+          {{end}}
+        </ul>
+      {{else}}
+        <p>No recent submissions.</p>
+      {{end}}
+    </div>
+
+    <!-- Post Study Plan Card -->
+    <div class="card" id="studyPlanCard">
+      <h3>Post Study Plan for Student</h3>
+      <form action="/post_study_plan" method="POST">
+        <input type="text" name="student_username" placeholder="Student Username" required style="width:100%; padding:8px; margin-bottom:10px;">
+        <textarea name="plan_details" placeholder="Study Plan Details" required style="width:100%; padding:8px; margin-bottom:10px;"></textarea>
+        <input type="date" name="exam_date" required style="margin-bottom:10px;">
+        <button class="btn" type="submit">Post Study Plan</button>
+      </form>
     </div>
   </div>
+
+  <script>
+    // Toggle dropdown
+    const manageBtn = document.getElementById('manageBtn')
+    const manageMenu = document.getElementById('manageMenu')
+    manageBtn.addEventListener('click', e => {
+      e.stopPropagation()
+      manageMenu.style.display = manageMenu.style.display === 'block' ? 'none' : 'block'
+    })
+    document.body.addEventListener('click', () => manageMenu.style.display = 'none')
+
+    // Show only the selected card
+    document.querySelectorAll('#manageMenu a').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault()
+        // hide all
+        document.querySelectorAll('.card').forEach(c => c.style.display = 'none')
+        // show selected
+        document.getElementById(link.dataset.show).style.display = 'block'
+        manageMenu.style.display = 'none'
+      })
+    })
+  </script>
 </body>
 </html>

@@ -59,6 +59,10 @@ func main() {
 			handlers.ShowAddQuestionForm(w, r)
 		}
 	}))
+	mux.HandleFunc("/submit_assignment", handlers.AuthMiddleware(handlers.SubmitAssignmentHandler))
+	mux.HandleFunc("/view_submissions", handlers.AuthMiddleware(handlers.ViewSubmissionsHandler))
+	mux.HandleFunc("/evaluate_submission", handlers.AuthMiddleware(handlers.EvaluateSubmissionHandler))
+	mux.HandleFunc("/post_study_plan", handlers.AuthMiddleware(handlers.PostStudyPlanHandler))
 
 	fmt.Println("✅ Server running at http://localhost:8000/")
 	log.Fatal(http.ListenAndServe(":8000", mux))

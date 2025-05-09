@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Assignment Submissions</title>
+  <link rel="stylesheet" href="/resource/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>Submissions for Assignment #{{.AssignmentID}}</h2>
+    {{if .Submissions}}
+      <table border="1" cellpadding="5">
+        <tr>
+          <th>Student</th>
+          <th>File</th>
+          <th>Submitted At</th>
+          <th>Marks</th>
+          <th>Feedback</th>
+          <th>Evaluate</th>
+        </tr>
+        {{range .Submissions}}
+        <tr>
+          <td>{{.Student}}</td>
+          <td><a href="/{{.FilePath}}" download>Download</a></td>
+          <td>{{.SubmittedAt}}</td>
+          <td>
+            {{if .Evaluated}}
+              {{if .Marks.Valid}}{{.Marks.Int64}}{{else}}N/A{{end}}
+            {{else}}
+              <form action="/evaluate_submission" method="POST" style="display:inline;">
+                <input type="hidden" name="submission_id" value="{{.ID}}">
+                <input type="number" name="marks" min="0" required style="width:60px;">
+            {{end}}
+          </td>
+          <td>
+            {{if .Evaluated}}
+              {{if .Feedback.Valid}}{{.Feedback.String}}{{else}}N/A{{end}}
+            {{else}}
+                <input type="text" name="feedback" placeholder="Feedback" required>
+            {{end}}
+          </td>
+          <td>
+            {{if not .Evaluated}}
+                <button type="submit">Submit</button>
+              </form>
+            {{else}}
+              Evaluated
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </table>
+    {{else}}
+      <p>No submissions yet.</p>
+    {{end}}
+    <a href="/dashboard">Back to Dashboard</a>
+  </div>
+</body>
+</html>
