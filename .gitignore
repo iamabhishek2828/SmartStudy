@@ -1,27 +1,19 @@
-# Binaries
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
+# Go build outputs
+/bin/
+/obj/
+/*.exe
+/*.dll
+/*.so
+*.log
 
-# Build and dependency directories
-bin/
-vendor/
+# Environment
+.env
+.env.local
+.env.*.local
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE/editor files
+# IDEs, editors
 .vscode/
 .idea/
 
-# Environment and config
-.env
-*.local
-
-# Uploaded files
-uploads/
+# Uploads, user data
+/uploads/
