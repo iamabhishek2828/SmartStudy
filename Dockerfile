@@ -8,6 +8,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+RUN mkdir -p uploads/assignments uploads/materials uploads/submissions
 RUN CGO_ENABLED=0 GOOS=linux go build -o smartstudy .
 
 # Final stage
