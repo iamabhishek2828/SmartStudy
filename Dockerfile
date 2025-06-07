@@ -20,6 +20,8 @@ COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/resource ./resource
 COPY --from=builder /app/uploads ./uploads
 
+
+
 ADD https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh /wait-for-it.sh
 RUN chmod +x /wait-for-it.sh
 
