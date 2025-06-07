@@ -19,6 +19,7 @@ func InitDB() {
 	if dsn == "" {
 		log.Fatal("DB_DSN environment variable not set")
 	}
+	log.Printf("Connecting to DB with DSN: %s", dsn)
 	var err error
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
