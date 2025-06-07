@@ -16,4 +16,10 @@
 .idea/
 
 # Uploads, user data
-/uploads/
+/uploads/*
+!/uploads/assignments/
+!/uploads/materials/
+!/uploads/submissions/
+!/uploads/assignments/.gitkeep
+!/uploads/materials/.gitkeep
+!/uploads/submissions/.gitkeep
