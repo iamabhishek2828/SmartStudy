@@ -8,7 +8,6 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN mkdir -p uploads/assignments uploads/materials uploads/submissions
 RUN CGO_ENABLED=0 GOOS=linux go build -o smartstudy .
 
 # Final stage
@@ -19,13 +18,8 @@ RUN apk add --no-cache ca-certificates bash
 COPY --from=builder /app/smartstudy .
 COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/resource ./resource
-COPY --from=builder /app/uploads ./uploads
-
-
-
-ADD https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh /wait-for-it.sh
-RUN chmod +x /wait-for-it.sh
+COPY uploads ./uploads
 
 EXPOSE 8080
 
-CMD ["bash", "/wait-for-it.sh", "db:3306", "--", "./smartstudy"]
+CMD ["./smartstudy"]
