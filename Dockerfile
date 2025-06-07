@@ -18,7 +18,7 @@ RUN apk add --no-cache ca-certificates bash
 COPY --from=builder /app/smartstudy .
 COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/resource ./resource
-COPY uploads ./uploads
+RUN mkdir -p /app/uploads/assignments /app/uploads/materials /app/uploads/submissions
 
 EXPOSE 8080
 
